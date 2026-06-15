@@ -24,6 +24,7 @@ export default function ApprovalFlowModal({ isOpen, onClose }: ApprovalFlowModal
   const approveLevel3 = useApprovalStore((state) => state.approveLevel3);
   const reject = useApprovalStore((state) => state.reject);
   const setChasePath = useApprovalStore((state) => state.setChasePath);
+  const setWorkOrderId = useApprovalStore((state) => state.setWorkOrderId);
   const currentUser = useAuthStore((state) => state.currentUser);
   const addWorkOrder = useWorkOrderStore((state) => state.addWorkOrder);
   const assignNearestRanger = useWorkOrderStore((state) => state.assignNearestRanger);
@@ -31,15 +32,10 @@ export default function ApprovalFlowModal({ isOpen, onClose }: ApprovalFlowModal
   const getWorkOrderById = useWorkOrderStore((state) => state.getWorkOrderById);
   const updateAlertStatus = useAlertStore((state) => state.updateAlertStatus);
   const [comment, setComment] = useState('');
-  const [workOrderCreated, setWorkOrderCreated] = useState(false);
 
   useEffect(() => {
     if (!approval || approval.type !== 'poaching' || approval.status !== 'approved') return;
-    if (approval.workOrderId) {
-      setWorkOrderCreated(true);
-      return;
-    }
-    if (workOrderCreated) return;
+    if (approval.workOrderId) return;
 
     const nearestRanger = approval.eventPosition ? getNearestRanger(approval.eventPosition) : undefined;
     const routePath: Position[] = [];
@@ -55,8 +51,7 @@ export default function ApprovalFlowModal({ isOpen, onClose }: ApprovalFlowModal
       routePath.push(approval.eventPosition);
     }
 
-    const workOrderId = `WO-${Date.now()}`;
-    addWorkOrder({
+    const newWorkOrderId = addWorkOrder({
       type: 'investigation',
       position: approval.eventPosition || [0, 0, 0],
       status: 'assigned',
@@ -64,13 +59,16 @@ export default function ApprovalFlowModal({ isOpen, onClose }: ApprovalFlowModal
       description: `偷猎事件追捕处置 - ${approval.cameraName || approval.description} - 关联审批 ${approval.id}`,
       priority: 'critical',
       assignedRangerId: nearestRanger?.id,
-      createdAt: new Date(),
       alertId: approval.alertId,
       cameraId: approval.cameraId,
+      captureTimestamp: approval.captureTimestamp,
+      captureConfidence: approval.captureConfidence,
+      eventPosition: approval.eventPosition,
+      cameraName: approval.cameraName,
     } as any);
 
     if (nearestRanger) {
-      assignNearestRanger(workOrderId);
+      assignNearestRanger(newWorkOrderId);
     }
 
     if (approval.alertId) {
@@ -78,8 +76,8 @@ export default function ApprovalFlowModal({ isOpen, onClose }: ApprovalFlowModal
     }
 
     setChasePath(approval.id, routePath);
-    setWorkOrderCreated(true);
-  }, [approval?.status, approval?.type, approval?.id, workOrderCreated, addWorkOrder, assignNearestRanger, getNearestRanger, updateAlertStatus, setChasePath, approval?.workOrderId, approval?.eventPosition, approval?.cameraName, approval?.description, approval?.alertId]);
+    setWorkOrderId(approval.id, newWorkOrderId);
+  }, [approval?.status, approval?.type, approval?.id, addWorkOrder, assignNearestRanger, getNearestRanger, updateAlertStatus, setChasePath, setWorkOrderId, approval?.workOrderId, approval?.eventPosition, approval?.cameraName, approval?.description, approval?.alertId, approval?.cameraId, approval?.captureTimestamp, approval?.captureConfidence]);
 
   if (!approval) return null;
 

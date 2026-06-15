@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Modal from '@/components/ui/Modal';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { ClipboardList, MapPin, Clock, User, Plane, Navigation, CheckCircle } from 'lucide-react';
+import { ClipboardList, MapPin, Clock, User, Plane, Navigation, CheckCircle, Camera, AlertTriangle } from 'lucide-react';
 import { useWorkOrderStore } from '@/store/useWorkOrderStore';
 import { useRangerStore } from '@/store/useRangerStore';
 import { useDroneStore } from '@/store/useDroneStore';
@@ -146,6 +146,62 @@ export default function WorkOrderDetailModal({ isOpen, onClose }: WorkOrderDetai
           </Card.Body>
         </Card>
 
+        {(workOrder.cameraName || workOrder.captureTimestamp) && (
+          <Card className="border-red-500/40 bg-red-500/10">
+          <Card.Header>
+            <div className="flex items-center gap-2">
+              <Camera size={16} className="text-red-400" />
+              <span className="text-sm font-medium text-white">📷 关联相机抓拍记录</span>
+            </div>
+          </Card.Header>
+          <Card.Body>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="flex items-center gap-2 text-sm">
+                <Camera size={14} className="text-cyan-400" />
+                <div>
+                  <div className="text-xs text-gray-500">抓拍相机</div>
+                  <div className="text-white font-medium">
+                    {workOrder.cameraName || '-'}
+                    {workOrder.cameraId && (
+                      <span className="text-gray-500 ml-1">({workOrder.cameraId})</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Clock size={14} className="text-yellow-400" />
+                <div>
+                  <div className="text-xs text-gray-500">抓拍时间</div>
+                  <div className="text-cyan-400 font-medium">
+                    {workOrder.captureTimestamp ? formatTime(workOrder.captureTimestamp) : '-'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <AlertTriangle size={14} className="text-orange-400" />
+                <div>
+                  <div className="text-xs text-gray-500">检测置信度</div>
+                  <div className="text-orange-400 font-medium">
+                    {typeof workOrder.captureConfidence === 'number' ? `${Math.round(workOrder.captureConfidence * 100)}%` : '-'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin size={14} className="text-red-400" />
+                <div>
+                  <div className="text-xs text-gray-500">事件位置</div>
+                  <div className="text-red-300 font-medium">
+                    {workOrder.eventPosition
+                      ? `(${workOrder.eventPosition[0].toFixed(1)}, ${workOrder.eventPosition[2].toFixed(1)})`
+                      : '-'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card.Body>
+        </Card>
+        )}
+
         {sourceDrone && (
           <Card>
             <Card.Header>
@@ -229,31 +285,39 @@ export default function WorkOrderDetailModal({ isOpen, onClose }: WorkOrderDetai
         </Card>
 
         {workOrder.routePath.length > 0 && (
-          <Card>
+          <Card className={cn(workOrder.type === 'investigation' && 'border-red-500/40')}>
             <Card.Header>
-              <span className="text-sm font-medium text-white">任务路径</span>
+              <span className={cn('text-sm font-medium', workOrder.type === 'investigation' ? 'text-red-400' : 'text-white')}>
+                {workOrder.type === 'investigation' ? '🚨 追捕路线' : '任务路径'}
+              </span>
             </Card.Header>
             <Card.Body>
-              <div className="h-32 bg-gray-900 rounded-lg relative overflow-hidden">
+              <div className={cn('h-32 rounded-lg relative overflow-hidden', workOrder.type === 'investigation' ? 'bg-red-900/20' : 'bg-gray-900')}>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <svg viewBox="0 0 200 100" className="w-full h-full">
                     <path
                       d="M 20 80 Q 60 20, 100 50 T 180 30"
                       fill="none"
-                      stroke="#22c55e"
-                      strokeWidth="2"
+                      stroke={workOrder.type === 'investigation' ? '#ef4444' : '#22c55e'}
+                      strokeWidth={workOrder.type === 'investigation' ? 3 : 2}
                       strokeDasharray="5,5"
                       className="animate-pulse"
                     />
-                    <circle cx="20" cy="80" r="4" fill="#3b82f6" />
-                    <circle cx="180" cy="30" r="5" fill="#22c55e" className="animate-ping" />
+                    <circle cx="20" cy="80" r="4" fill={workOrder.type === 'investigation' ? '#22c55e' : '#3b82f6'} />
+                    <circle
+                      cx="180"
+                      cy="30"
+                      r="5"
+                      fill={workOrder.type === 'investigation' ? '#ef4444' : '#22c55e'}
+                      className="animate-ping"
+                    />
                   </svg>
                 </div>
                 <div className="absolute bottom-2 left-2 text-xs text-gray-400">
                   路径长度: 约 {(workOrder.routePath.length * 0.5).toFixed(1)} km
                 </div>
-                <div className="absolute bottom-2 right-2 text-xs text-green-400">
-                  预计: {Math.round(workOrder.routePath.length * 0.2)} 分钟
+                <div className={cn('absolute bottom-2 right-2 text-xs', workOrder.type === 'investigation' ? 'text-red-400' : 'text-green-400')}>
+                  {workOrder.type === 'investigation' ? '紧急追捕' : `预计: ${Math.round(workOrder.routePath.length * 0.2)} 分钟`}
                 </div>
               </div>
             </Card.Body>

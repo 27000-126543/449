@@ -14,14 +14,15 @@ import Drones from './Drones';
 import HeatMap from './HeatMap';
 import PathLines from './PathLines';
 import { useState } from 'react';
-import type { Position } from '@/types';
+import type { Position, RescueStatus } from '@/types';
 
 interface SceneProps {
   showHeatMap?: boolean;
   rescueRoute?: Position[] | null;
+  rescueStatus?: RescueStatus;
 }
 
-export default function Scene({ showHeatMap = true, rescueRoute = null }: SceneProps) {
+export default function Scene({ showHeatMap = true, rescueRoute = null, rescueStatus = 'reported' }: SceneProps) {
   return (
     <Canvas
       shadows

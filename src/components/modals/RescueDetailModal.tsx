@@ -11,6 +11,7 @@ import type { Rescue, RescueStation, RescueSeverity, RescueStatus, Animal, Posit
 interface RescueDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onStatusChange?: (status: RescueStatus, shouldShowRoute: boolean) => void;
 }
 
 function calcDistance2D(p1: Position, p2: Position): number {
@@ -32,7 +33,7 @@ function findNearestRescueStation(animalPos: Position) {
   return { station: nearest, distance: minDist };
 }
 
-export default function RescueDetailModal({ isOpen, onClose }: RescueDetailModalProps) {
+export default function RescueDetailModal({ isOpen, onClose, onStatusChange }: RescueDetailModalProps) {
   const getAnimalById = useAnimalStore((state) => state.getAnimalById);
   const selectedAnimalId = useAnimalStore((state) => state.selectedAnimalId);
   const updateAnimalStatus = useAnimalStore((state) => state.updateAnimalStatus);
@@ -73,6 +74,12 @@ export default function RescueDetailModal({ isOpen, onClose }: RescueDetailModal
       createdAt: new Date(),
     });
   }, [isOpen, selectedAnimalId, rescueAnimalId, getAnimalById, animals]);
+
+  useEffect(() => {
+    if (!onStatusChange) return;
+    const shouldShowRoute = activeRescue.status === 'in_transit';
+    onStatusChange(activeRescue.status, shouldShowRoute);
+  }, [activeRescue.status, onStatusChange]);
 
   const rescueStation = mockRescueStations.find((s) => s.id === activeRescue.stationId) || mockRescueStations[0];
   const distance = animalInRescue

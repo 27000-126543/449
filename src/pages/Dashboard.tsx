@@ -16,7 +16,7 @@ import { useWorkOrderStore } from '@/store/useWorkOrderStore';
 import { useApprovalStore } from '@/store/useApprovalStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
-import type { Position } from '@/types';
+import type { Position, RescueStatus } from '@/types';
 import { mockRescueStations } from '@/data/rescue';
 
 type ModalType = 'animal' | 'alert' | 'camera' | 'approval' | 'workorder' | 'rescue' | null;
@@ -60,6 +60,7 @@ export default function Dashboard() {
   const [showHeatMap, setShowHeatMap] = useState(true);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [rescueRoute, setRescueRoute] = useState<Position[] | null>(null);
+  const [rescueStatus, setRescueStatus] = useState<RescueStatus>('reported');
 
   const selectedAnimalId = useAnimalStore((state) => state.selectedAnimalId);
   const selectedAlertId = useAlertStore((state) => state.selectedAlertId);
@@ -119,9 +120,9 @@ export default function Dashboard() {
     } else if (current === 'approval') {
       useApprovalStore.getState().selectApproval(null);
     } else if (current === 'rescue') {
-      // 关闭救助中心时一起清理动物选择
       useAnimalStore.getState().selectAnimal(null);
       setRescueRoute(null);
+      setRescueStatus('reported');
     }
   };
 
@@ -132,8 +133,22 @@ export default function Dashboard() {
       const route = buildRescueRoute(animal.position, nearestStation.position);
       setRescueRoute(route);
     }
+    setRescueStatus('reported');
     setActiveModal('rescue');
   }, [animals, selectedAnimalId]);
+
+  const handleRescueStatusChange = useCallback((status: RescueStatus, shouldShowRoute: boolean) => {
+    setRescueStatus(status);
+    if (!shouldShowRoute) {
+      setRescueRoute(null);
+    } else if (!rescueRoute) {
+      const animal = animals.find(a => a.id === selectedAnimalId);
+      if (animal) {
+        const nearestStation = findNearestRescueStation(animal.position);
+        setRescueRoute(buildRescueRoute(animal.position, nearestStation.position));
+      }
+    }
+  }, [animals, selectedAnimalId, rescueRoute]);
 
   const handleGoToApproval = useCallback((approvalId: string) => {
     useApprovalStore.getState().selectApproval(approvalId);
@@ -144,6 +159,18 @@ export default function Dashboard() {
   if (!isLoggedIn) {
     return null;
   }
+
+  const showRescueRoute = rescueStatus === 'in_transit';
+  const visibleRescueRoute = showRescueRoute ? rescueRoute : null;
+
+  const statusInfo: Record<RescueStatus, { label: string; color: string; bg: string; border: string; dot: string } | null> = {
+    reported: null,
+    approved: null,
+    in_transit: { label: '🚛 动物救助运输中 - 已规划最优路线至救助站', color: 'text-blue-300', bg: 'bg-blue-500/20', border: 'border-blue-500/40', dot: 'bg-blue-500' },
+    treated: { label: '🏥 动物已送达救助站，治疗中', color: 'text-orange-300', bg: 'bg-orange-500/20', border: 'border-orange-500/40', dot: 'bg-orange-500' },
+    released: { label: '💚 动物已完成治疗，正在康复观察', color: 'text-emerald-300', bg: 'bg-emerald-500/20', border: 'border-emerald-500/40', dot: 'bg-emerald-500' },
+  };
+  const rescueStatusInfo = statusInfo[rescueStatus];
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-950 overflow-hidden">
@@ -164,37 +191,39 @@ export default function Dashboard() {
         </div>
 
         <div className="flex-1 relative">
-          <Scene showHeatMap={showHeatMap} rescueRoute={rescueRoute} />
+          <Scene showHeatMap={showHeatMap} rescueRoute={visibleRescueRoute} rescueStatus={rescueStatus} />
 
           <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-900/80 backdrop-blur-sm rounded-full px-4 py-2 border border-gray-700/50">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <span className="text-sm text-gray-300">系统运行中</span>
             <div className="w-px h-4 bg-gray-700" />
             <span className="text-sm text-emerald-400 font-medium">实时监控</span>
-            {rescueRoute && (
+            {showRescueRoute && (
               <>
                 <div className="w-px h-4 bg-gray-700" />
                 <div className="flex items-center gap-1 text-xs text-blue-400">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                  救助运输路线已激活
+                  救助运输中
                 </div>
               </>
             )}
           </div>
 
-          {rescueRoute && (
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-blue-500/20 backdrop-blur-sm border border-blue-500/40 rounded-lg px-4 py-2 z-10">
+          {rescueStatusInfo && (
+            <div className={`absolute top-20 left-1/2 -translate-x-1/2 ${rescueStatusInfo.bg} backdrop-blur-sm border ${rescueStatusInfo.border} rounded-lg px-4 py-2 z-10`}>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-                <span className="text-sm text-blue-300 font-medium">
-                  🚨 动物救助运输中 - 已规划最优路线至救助站
+                <div className={`w-2 h-2 ${rescueStatusInfo.dot} rounded-full animate-ping`} />
+                <span className={`text-sm ${rescueStatusInfo.color} font-medium`}>
+                  {rescueStatusInfo.label}
                 </span>
-                <button
-                  onClick={() => setRescueRoute(null)}
-                  className="ml-2 text-xs text-blue-400 hover:text-blue-300"
-                >
-                  [清除]
-                </button>
+                {showRescueRoute && (
+                  <button
+                    onClick={() => setRescueRoute(null)}
+                    className="ml-2 text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    [清除]
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -244,7 +273,7 @@ export default function Dashboard() {
       <CameraDetailModal isOpen={activeModal === 'camera'} onClose={handleCloseModal} onGoToApproval={handleGoToApproval} />
       <ApprovalFlowModal isOpen={activeModal === 'approval'} onClose={handleCloseModal} />
       <WorkOrderDetailModal isOpen={activeModal === 'workorder'} onClose={handleCloseModal} />
-      <RescueDetailModal isOpen={activeModal === 'rescue'} onClose={handleCloseModal} />
+      <RescueDetailModal isOpen={activeModal === 'rescue'} onClose={handleCloseModal} onStatusChange={handleRescueStatusChange} />
     </div>
   );
 }

@@ -9,7 +9,7 @@ interface WorkOrderState {
   selectedWorkOrderId: string | null;
   getWorkOrderById: (id: string) => WorkOrder | undefined;
   selectWorkOrder: (id: string | null) => void;
-  addWorkOrder: (order: Omit<WorkOrder, 'id' | 'createdAt'>) => void;
+  addWorkOrder: (orderData: Omit<WorkOrder, 'id' | 'createdAt'>) => string;
   updateWorkOrderStatus: (id: string, status: WorkOrder['status']) => void;
   assignRanger: (orderId: string, rangerId: string) => void;
   setRoutePath: (orderId: string, path: Position[]) => void;
@@ -27,14 +27,16 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
   selectWorkOrder: (id) => set({ selectedWorkOrderId: id }),
 
   addWorkOrder: (orderData) => {
+    const workOrderId = `WO-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const newOrder: WorkOrder = {
       ...orderData,
-      id: `WO-${Date.now()}`,
+      id: workOrderId,
       createdAt: new Date(),
     } as WorkOrder;
     set((state) => ({
       workOrders: [newOrder, ...state.workOrders],
     }));
+    return workOrderId;
   },
 
   updateWorkOrderStatus: (id, status) =>

@@ -14,6 +14,7 @@ interface ApprovalState {
   approveLevel3: (id: string, comment: string) => void;
   reject: (id: string, level: number, comment: string) => void;
   setChasePath: (id: string, path: Position[]) => void;
+  setWorkOrderId: (id: string, workOrderId: string) => void;
   getPendingApprovals: () => Approval[];
   getApprovalsByType: (type: Approval['type']) => Approval[];
 }
@@ -119,6 +120,13 @@ export const useApprovalStore = create<ApprovalState>((set, get) => ({
     set((state) => ({
       approvals: state.approvals.map((a) =>
         a.id === id ? { ...a, chasePath: path } : a
+      ),
+    })),
+
+  setWorkOrderId: (id, workOrderId) =>
+    set((state) => ({
+      approvals: state.approvals.map((a) =>
+        a.id === id ? { ...a, workOrderId } : a
       ),
     })),
 

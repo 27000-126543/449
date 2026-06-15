@@ -112,6 +112,10 @@ export interface WorkOrder {
   priority: 'low' | 'medium' | 'high' | 'critical';
   alertId?: string;
   cameraId?: string;
+  cameraName?: string;
+  captureTimestamp?: Date;
+  captureConfidence?: number;
+  eventPosition?: Position;
 }
 
 export type ApprovalType = 'poaching' | 'rescue' | 'patrol' | 'drone_deployment';

@@ -34,8 +34,8 @@ export default function PathLines({ rescueRoute = null }: PathLinesProps) {
         <PathLine
           key={`wo-${wo.id}`}
           points={wo.routePath as Position[]}
-          color="#22c55e"
-          lineWidth={1}
+          color={wo.type === 'investigation' ? '#ef4444' : '#22c55e'}
+          lineWidth={wo.type === 'investigation' ? 1.5 : 1}
         />
       ))}
 
