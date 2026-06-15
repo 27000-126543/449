@@ -12,9 +12,10 @@ import { cn } from '@/lib/utils';
 interface CameraDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onGoToApproval?: (approvalId: string) => void;
 }
 
-export default function CameraDetailModal({ isOpen, onClose }: CameraDetailModalProps) {
+export default function CameraDetailModal({ isOpen, onClose, onGoToApproval }: CameraDetailModalProps) {
   const selectedCameraId = useCameraStore((state) => state.selectedCameraId);
   const camera = useCameraStore((state) => state.getCameraById(selectedCameraId || ''));
   const addApproval = useApprovalStore((state) => state.addApproval);
@@ -106,8 +107,12 @@ export default function CameraDetailModal({ isOpen, onClose }: CameraDetailModal
 
   const handleGoToApproval = () => {
     if (lastApprovalId) {
-      selectApproval(lastApprovalId);
-      onClose();
+      if (onGoToApproval) {
+        onGoToApproval(lastApprovalId);
+      } else {
+        selectApproval(lastApprovalId);
+        onClose();
+      }
     }
   };
 

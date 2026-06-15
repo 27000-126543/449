@@ -1,19 +1,21 @@
-import { useState } from 'react';
-import { PawPrint, Users, AlertTriangle, ClipboardList, ChevronDown, ChevronRight } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { PawPrint, Users, AlertTriangle, ClipboardList, ChevronDown, ChevronRight, FileCheck } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import { useAnimalStore } from '@/store/useAnimalStore';
 import { useRangerStore } from '@/store/useRangerStore';
 import { useAlertStore } from '@/store/useAlertStore';
 import { useWorkOrderStore } from '@/store/useWorkOrderStore';
+import { useApprovalStore } from '@/store/useApprovalStore';
 import { getStatusColor, getAlertTypeText, getLevelColor, getLevelText, getWorkOrderTypeText } from '@/utils/helpers';
 import { cn } from '@/lib/utils';
+import type { ApprovalStatus } from '@/types';
 
 interface LeftPanelProps {
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-type TabType = 'animals' | 'rangers' | 'alerts' | 'workorders';
+type TabType = 'animals' | 'rangers' | 'alerts' | 'workorders' | 'approvals';
 
 export default function LeftPanel({ isOpen = true, onClose }: LeftPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('alerts');
@@ -37,21 +39,57 @@ export default function LeftPanel({ isOpen = true, onClose }: LeftPanelProps) {
   const workOrders = useWorkOrderStore((state) => state.workOrders);
   const selectWorkOrder = useWorkOrderStore((state) => state.selectWorkOrder);
 
+  const approvals = useApprovalStore((state) => state.approvals);
+  const selectApproval = useApprovalStore((state) => state.selectApproval);
+
   const patrolRangers = rangers.filter((r) => r.role === 'ranger');
 
   const criticalAlerts = alerts.filter((a) => a.level === 'critical' && a.status !== 'resolved');
   const highAlerts = alerts.filter((a) => a.level === 'high' && a.status !== 'resolved');
   const normalAlerts = alerts.filter((a) => (a.level === 'medium' || a.level === 'low') && a.status !== 'resolved');
 
+  const pendingApprovalsCount = useMemo(() => {
+    return approvals.filter(a => a.status.startsWith('pending_')).length;
+  }, [approvals]);
+
   const tabs = [
     { id: 'alerts' as TabType, label: '预警', icon: AlertTriangle, count: criticalAlerts.length + highAlerts.length },
     { id: 'animals' as TabType, label: '动物', icon: PawPrint, count: animals.length },
     { id: 'rangers' as TabType, label: '巡护员', icon: Users, count: patrolRangers.length },
     { id: 'workorders' as TabType, label: '工单', icon: ClipboardList, count: workOrders.filter((w) => w.status !== 'completed').length },
+    { id: 'approvals' as TabType, label: '审批', icon: FileCheck, count: pendingApprovalsCount },
   ];
 
   const toggleSection = (key: string) => {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getApprovalTypeText = (type: string) => {
+    const map: Record<string, string> = {
+      poaching: '偷猎事件处置',
+      rescue: '救助方案审批',
+      patrol: '巡护任务审批',
+      drone_deployment: '无人机部署',
+    };
+    return map[type] || type;
+  };
+
+  const getApprovalStatusText = (status: ApprovalStatus) => {
+    const map: Record<ApprovalStatus, string> = {
+      pending_level1: '待一级审批',
+      pending_level2: '待二级审批',
+      pending_level3: '待三级审批',
+      approved: '已通过',
+      rejected: '已否决',
+    };
+    return map[status] || status;
+  };
+
+  const getApprovalStatusColor = (status: ApprovalStatus) => {
+    if (status.startsWith('pending_')) return 'bg-yellow-500/20 text-yellow-400';
+    if (status === 'approved') return 'bg-green-500/20 text-green-400';
+    if (status === 'rejected') return 'bg-red-500/20 text-red-400';
+    return 'bg-gray-500/20 text-gray-400';
   };
 
   const getSpeciesText = (species: string) => {
@@ -321,6 +359,77 @@ export default function LeftPanel({ isOpen = true, onClose }: LeftPanelProps) {
                 </Card.Body>
               </Card>
             ))}
+          </div>
+        )}
+
+        {activeTab === 'approvals' && (
+          <div className="space-y-2">
+            {approvals.length === 0 ? (
+              <div className="text-center text-gray-500 text-sm py-8">
+                暂无审批事件
+              </div>
+            ) : (
+              [...approvals]
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .map((approval) => (
+                <Card
+                  key={approval.id}
+                  hoverable
+                  onClick={() => selectApproval(approval.id)}
+                  className="transition-all"
+                >
+                  <Card.Body className="py-3">
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={cn(
+                          'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                          approval.status.startsWith('pending_')
+                            ? 'bg-yellow-500/20'
+                            : approval.status === 'approved'
+                            ? 'bg-green-500/20'
+                            : 'bg-red-500/20'
+                        )}
+                      >
+                        <FileCheck
+                          size={20}
+                          className={cn(
+                            approval.status.startsWith('pending_')
+                              ? 'text-yellow-400'
+                              : approval.status === 'approved'
+                              ? 'text-green-400'
+                              : 'text-red-400'
+                          )}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white truncate">{approval.description}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          相机编号：{approval.targetId}
+                        </div>
+                        <div className="flex items-center justify-between mt-1 gap-2">
+                          <span className="text-xs text-gray-500">
+                            {new Date(approval.createdAt).toLocaleString('zh-CN', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                          <span
+                            className={cn(
+                              'px-1.5 py-0.5 rounded text-xs flex-shrink-0',
+                              getApprovalStatusColor(approval.status)
+                            )}
+                          >
+                            {getApprovalStatusText(approval.status)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              ))
+            )}
           </div>
         )}
       </div>

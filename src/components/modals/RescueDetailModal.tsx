@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Modal from '@/components/ui/Modal';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -6,40 +6,76 @@ import { Heart, MapPin, Clock, Stethoscope, Baby, Shield, CheckCircle, Play, Car
 import { useAnimalStore } from '@/store/useAnimalStore';
 import { mockRescues, mockRescueStations } from '@/data/rescue';
 import { cn } from '@/lib/utils';
-import type { Rescue, RescueStation, RescueSeverity, RescueStatus } from '@/types';
+import type { Rescue, RescueStation, RescueSeverity, RescueStatus, Animal, Position } from '@/types';
 
 interface RescueDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function RescueDetailModal({ isOpen, onClose }: RescueDetailModalProps) {
-  const selectedAnimalId = useAnimalStore((state) => state.selectedAnimalId);
-  const animal = useAnimalStore((state) => state.getAnimalById(selectedAnimalId || ''));
-  const animals = useAnimalStore((state) => state.animals);
-  const animalInRescue = animals.find(a => a.id === selectedAnimalId);
+function calcDistance2D(p1: Position, p2: Position): number {
+  const dx = p1[0] - p2[0];
+  const dz = p1[2] - p2[2];
+  return Math.sqrt(dx * dx + dz * dz);
+}
 
-  const [activeRescue, setActiveRescue] = useState<Rescue>(() => {
-    if (animalInRescue) {
-      return {
-        id: `RESC-${Date.now()}`,
-        animalId: animalInRescue.id,
-        stationId: mockRescueStations[0].id,
-        severity: determineSeverity(animalInRescue),
-        status: 'reported',
-        injuryType: `疑似${getInjuryType(animalInRescue)}，心率${animalInRescue.heartRate}bpm，体温${animalInRescue.temperature.toFixed(1)}°C`,
-        route: generateRescueRoute(animalInRescue.position, mockRescueStations[0].position),
-        vetSignoff: false,
-        caretakerSignoff: false,
-        directorSignoff: false,
-        createdAt: new Date(),
-      };
+function findNearestRescueStation(animalPos: Position) {
+  let nearest = mockRescueStations[0];
+  let minDist = calcDistance2D(animalPos, nearest.position);
+  for (const s of mockRescueStations) {
+    const d = calcDistance2D(animalPos, s.position);
+    if (d < minDist) {
+      minDist = d;
+      nearest = s;
     }
-    return mockRescues[0];
-  });
+  }
+  return { station: nearest, distance: minDist };
+}
+
+export default function RescueDetailModal({ isOpen, onClose }: RescueDetailModalProps) {
+  const getAnimalById = useAnimalStore((state) => state.getAnimalById);
+  const selectedAnimalId = useAnimalStore((state) => state.selectedAnimalId);
+  const animals = useAnimalStore((state) => state.animals);
+
+  const [rescueAnimalId, setRescueAnimalId] = useState<string | null>(null);
+  const animalInRescue = useMemo(() => {
+    const id = rescueAnimalId || selectedAnimalId;
+    if (!id) return null;
+    return getAnimalById(id) || animals.find(a => a.id === id) || null;
+  }, [rescueAnimalId, selectedAnimalId, getAnimalById, animals]);
+
+  const [activeRescue, setActiveRescue] = useState<Rescue>(mockRescues[0]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const id = selectedAnimalId || rescueAnimalId;
+    if (!id) return;
+    const animal = getAnimalById(id) || animals.find(a => a.id === id);
+    if (!animal) return;
+
+    if (!rescueAnimalId) setRescueAnimalId(id);
+
+    const { station } = findNearestRescueStation(animal.position);
+
+    setActiveRescue({
+      id: `RESC-${Date.now()}`,
+      animalId: animal.id,
+      stationId: station.id,
+      severity: determineSeverity(animal),
+      status: 'reported',
+      injuryType: `疑似${getInjuryType(animal)}，心率${animal.heartRate}bpm，体温${animal.temperature.toFixed(1)}°C`,
+      route: generateRescueRoute(animal.position, station.position),
+      vetSignoff: false,
+      caretakerSignoff: false,
+      directorSignoff: false,
+      createdAt: new Date(),
+    });
+  }, [isOpen, selectedAnimalId, rescueAnimalId, getAnimalById, animals]);
 
   const rescueStation = mockRescueStations.find((s) => s.id === activeRescue.stationId) || mockRescueStations[0];
-  const distance = calculateDistance(animalInRescue?.position || [0,0,0], rescueStation.position);
+  const distance = animalInRescue
+    ? calculateDistance(animalInRescue.position, rescueStation.position)
+    : 0;
 
   const severityColors: Record<RescueSeverity, string> = {
     mild: 'bg-green-500/20 text-green-400 border-green-500/30',

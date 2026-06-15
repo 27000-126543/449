@@ -17,8 +17,40 @@ import { useApprovalStore } from '@/store/useApprovalStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 import type { Position } from '@/types';
+import { mockRescueStations } from '@/data/rescue';
 
 type ModalType = 'animal' | 'alert' | 'camera' | 'approval' | 'workorder' | 'rescue' | null;
+
+function calcDistance2D(p1: Position, p2: Position): number {
+  const dx = p1[0] - p2[0];
+  const dz = p1[2] - p2[2];
+  return Math.sqrt(dx * dx + dz * dz);
+}
+
+function findNearestRescueStation(animalPos: Position) {
+  let nearest = mockRescueStations[0];
+  let minDist = calcDistance2D(animalPos, nearest.position);
+  for (const s of mockRescueStations) {
+    const d = calcDistance2D(animalPos, s.position);
+    if (d < minDist) {
+      minDist = d;
+      nearest = s;
+    }
+  }
+  return nearest;
+}
+
+function buildRescueRoute(from: Position, to: Position): Position[] {
+  const midX = (from[0] + to[0]) / 2;
+  const midZ = (from[2] + to[2]) / 2;
+  return [
+    from,
+    [midX, 0.5, from[2]],
+    [midX, 0.5, midZ],
+    [to[0], 0.5, midZ],
+    to,
+  ];
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -74,31 +106,40 @@ export default function Dashboard() {
   }, [selectedApprovalId]);
 
   const handleCloseModal = () => {
+    const current = activeModal;
     setActiveModal(null);
-    useAnimalStore.getState().selectAnimal(null);
-    useAlertStore.getState().selectAlert(null);
-    useCameraStore.getState().selectCamera(null);
-    useWorkOrderStore.getState().selectWorkOrder(null);
-    useApprovalStore.getState().selectApproval(null);
+    if (current === 'animal') {
+      // 不清除selectedAnimalId，因为救助流程弹窗需要这个状态
+    } else if (current === 'alert') {
+      useAlertStore.getState().selectAlert(null);
+    } else if (current === 'camera') {
+      useCameraStore.getState().selectCamera(null);
+    } else if (current === 'workorder') {
+      useWorkOrderStore.getState().selectWorkOrder(null);
+    } else if (current === 'approval') {
+      useApprovalStore.getState().selectApproval(null);
+    } else if (current === 'rescue') {
+      // 关闭救助中心时一起清理动物选择
+      useAnimalStore.getState().selectAnimal(null);
+      setRescueRoute(null);
+    }
   };
 
   const handleOpenRescue = useCallback(() => {
     const animal = animals.find(a => a.id === selectedAnimalId);
     if (animal) {
-      const rescueStation: Position = [30, 0, -25];
-      const startPos = animal.position;
-      const midX = (startPos[0] + rescueStation[0]) / 2;
-      const midZ = (startPos[2] + rescueStation[2]) / 2;
-      setRescueRoute([
-        startPos,
-        [midX, 0.5, startPos[2]],
-        [midX, 0.5, midZ],
-        [rescueStation[0], 0.5, midZ],
-        rescueStation,
-      ]);
+      const nearestStation = findNearestRescueStation(animal.position);
+      const route = buildRescueRoute(animal.position, nearestStation.position);
+      setRescueRoute(route);
     }
     setActiveModal('rescue');
   }, [animals, selectedAnimalId]);
+
+  const handleGoToApproval = useCallback((approvalId: string) => {
+    useApprovalStore.getState().selectApproval(approvalId);
+    useCameraStore.getState().selectCamera(null);
+    setActiveModal('approval');
+  }, []);
 
   if (!isLoggedIn) {
     return null;
@@ -200,7 +241,7 @@ export default function Dashboard() {
 
       <AnimalDetailModal isOpen={activeModal === 'animal'} onClose={handleCloseModal} onOpenRescue={handleOpenRescue} />
       <AlertDetailModal isOpen={activeModal === 'alert'} onClose={handleCloseModal} />
-      <CameraDetailModal isOpen={activeModal === 'camera'} onClose={handleCloseModal} />
+      <CameraDetailModal isOpen={activeModal === 'camera'} onClose={handleCloseModal} onGoToApproval={handleGoToApproval} />
       <ApprovalFlowModal isOpen={activeModal === 'approval'} onClose={handleCloseModal} />
       <WorkOrderDetailModal isOpen={activeModal === 'workorder'} onClose={handleCloseModal} />
       <RescueDetailModal isOpen={activeModal === 'rescue'} onClose={handleCloseModal} />
