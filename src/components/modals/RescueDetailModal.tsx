@@ -35,6 +35,8 @@ function findNearestRescueStation(animalPos: Position) {
 export default function RescueDetailModal({ isOpen, onClose }: RescueDetailModalProps) {
   const getAnimalById = useAnimalStore((state) => state.getAnimalById);
   const selectedAnimalId = useAnimalStore((state) => state.selectedAnimalId);
+  const updateAnimalStatus = useAnimalStore((state) => state.updateAnimalStatus);
+  const updateAnimalVitals = useAnimalStore((state) => state.updateAnimalVitals);
   const animals = useAnimalStore((state) => state.animals);
 
   const [rescueAnimalId, setRescueAnimalId] = useState<string | null>(null);
@@ -171,6 +173,25 @@ export default function RescueDetailModal({ isOpen, onClose }: RescueDetailModal
       ...prev,
       status: 'treated',
     }));
+    if (animalInRescue) {
+      updateAnimalVitals(
+        animalInRescue.id,
+        Math.round(animalInRescue.heartRate * 0.85),
+        38.2
+      );
+    }
+  };
+
+  const handleReleaseAnimal = () => {
+    setActiveRescue(prev => ({
+      ...prev,
+      status: 'released',
+    }));
+    if (animalInRescue) {
+      updateAnimalStatus(animalInRescue.id, 'warning');
+      const normalHR = animalInRescue.species === 'tiger' ? 68 : animalInRescue.species === 'leopard' ? 72 : 78;
+      updateAnimalVitals(animalInRescue.id, normalHR, 37.8);
+    }
   };
 
   if (!animalInRescue) {
@@ -240,6 +261,46 @@ export default function RescueDetailModal({ isOpen, onClose }: RescueDetailModal
                   <span className="flex items-center gap-1 text-emerald-400">
                     <Car size={12} /> 运输距离: {distance.toFixed(1)} km
                   </span>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-700/60">
+                  <div className="text-xs font-semibold text-gray-400 mb-3">
+                    📍 救助流程状态进度
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {[
+                      { key: 'reported', label: '已上报', condition: true, color: 'gray' },
+                      { key: 'signoff', label: '三级会签', condition: allSignedOff, color: 'purple' },
+                      { key: 'in_transit', label: '运输中', condition: activeRescue.status === 'in_transit' || activeRescue.status === 'treated' || activeRescue.status === 'released', color: 'blue' },
+                      { key: 'treated', label: '已送达/治疗中', condition: activeRescue.status === 'treated' || activeRescue.status === 'released', color: 'orange' },
+                      { key: 'released', label: '已康复', condition: activeRescue.status === 'released', color: 'emerald' },
+                    ].map((step, idx, arr) => {
+                      const isLast = idx === arr.length - 1;
+                      const colorClasses: Record<string, string> = {
+                        gray: 'bg-gray-600 border-gray-500 text-gray-200',
+                        purple: 'bg-purple-600 border-purple-400 text-purple-100',
+                        blue: 'bg-blue-600 border-blue-400 text-blue-100',
+                        orange: 'bg-orange-600 border-orange-400 text-orange-100',
+                        emerald: 'bg-emerald-600 border-emerald-400 text-emerald-100',
+                      };
+                      const fadedClass = step.condition ? colorClasses[step.color] : 'bg-gray-800/80 border-gray-700 text-gray-500';
+                      return (
+                        <div key={step.key} className="flex items-center flex-1 min-w-0">
+                          <div className={cn('w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 text-[10px] font-bold', fadedClass)}>
+                            {step.condition ? '✓' : idx + 1}
+                          </div>
+                          <div className={cn('ml-1 flex-1 min-w-0 text-[10px] leading-tight truncate', step.condition ? 'text-white font-medium' : 'text-gray-500')}>
+                            {step.label}
+                          </div>
+                          {!isLast && (
+                            <div className={cn('w-4 h-0.5 mx-1 flex-shrink-0 rounded',
+                              step.condition ? `bg-${step.color === 'gray' && allSignedOff ? 'purple' : step.color}-500` : 'bg-gray-700'
+                            )} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -515,17 +576,17 @@ export default function RescueDetailModal({ isOpen, onClose }: RescueDetailModal
           </Card.Body>
         </Card>
 
-        <div className="grid md:grid-cols-3 gap-3">
+        <div className="grid md:grid-cols-4 gap-3">
           <Button
             variant={allSignedOff && activeRescue.status === 'reported' ? 'success' : 'secondary'}
             onClick={handleStartTransport}
-            disabled={!allSignedOff || activeRescue.status === 'in_transit' || activeRescue.status === 'treated'}
+            disabled={!allSignedOff || activeRescue.status === 'in_transit' || activeRescue.status === 'treated' || activeRescue.status === 'released'}
             className="py-3 text-base"
           >
             <Car size={18} className="mr-2" />
             {activeRescue.status === 'reported' && !allSignedOff ? '⏳ 等待会签完成' :
              activeRescue.status === 'in_transit' ? '🚛 运输进行中...' :
-             activeRescue.status === 'treated' ? '✅ 已送达' :
+             activeRescue.status === 'treated' || activeRescue.status === 'released' ? '✅ 已送达' :
              '🚀 启动运输'}
           </Button>
           <Button
@@ -535,7 +596,20 @@ export default function RescueDetailModal({ isOpen, onClose }: RescueDetailModal
             className="py-3 text-base"
           >
             <CheckCircle size={18} className="mr-2" />
-            {activeRescue.status === 'in_transit' ? '🏥 确认救助完成' : '⏳ 待运输完成'}
+            {activeRescue.status === 'in_transit' ? '🏥 确认已送达' :
+             activeRescue.status === 'treated' || activeRescue.status === 'released' ? '✅ 治疗中' :
+             '⏳ 待运输完成'}
+          </Button>
+          <Button
+            variant={activeRescue.status === 'treated' ? 'success' : 'secondary'}
+            onClick={handleReleaseAnimal}
+            disabled={activeRescue.status !== 'treated'}
+            className="py-3 text-base"
+          >
+            <Heart size={18} className="mr-2" />
+            {activeRescue.status === 'treated' ? '💚 完成治疗，动物已康复' :
+             activeRescue.status === 'released' ? '✅ 已康复（观察中）' :
+             '⏳ 待治疗完成'}
           </Button>
           <Button
             variant="secondary"

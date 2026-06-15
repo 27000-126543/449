@@ -110,6 +110,8 @@ export interface WorkOrder {
   routePath: Position[];
   description: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
+  alertId?: string;
+  cameraId?: string;
 }
 
 export type ApprovalType = 'poaching' | 'rescue' | 'patrol' | 'drone_deployment';
@@ -138,6 +140,13 @@ export interface Approval {
   chasePath?: Position[];
   createdAt: Date;
   description: string;
+  cameraId?: string;
+  cameraName?: string;
+  captureTimestamp?: Date;
+  captureConfidence?: number;
+  eventPosition?: Position;
+  alertId?: string;
+  workOrderId?: string;
 }
 
 export interface RescueStaff {

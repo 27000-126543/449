@@ -102,6 +102,12 @@ export const mockApprovals: Approval[] = [
     createdAt: new Date(Date.now() - 8 * 60 * 1000),
     description: '东区偷猎事件追捕方案审批',
     chasePath: generateRescueRoute([22, 0.1, -18], [28, 0.3, -5]),
+    cameraId: 'CAM002',
+    cameraName: '红外相机-东区02',
+    captureTimestamp: new Date(Date.now() - 8 * 60 * 1000),
+    captureConfidence: 0.92,
+    eventPosition: [28, 0.3, -5],
+    alertId: 'ALT003',
   },
   {
     id: 'APP002',

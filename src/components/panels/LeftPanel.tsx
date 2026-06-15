@@ -404,8 +404,26 @@ export default function LeftPanel({ isOpen = true, onClose }: LeftPanelProps) {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-white truncate">{approval.description}</div>
                         <div className="text-xs text-gray-400 mt-0.5">
-                          相机编号：{approval.targetId}
+                          {approval.cameraName
+                            ? `${approval.cameraName}${approval.cameraId ? ` (${approval.cameraId})` : ''}`
+                            : approval.type === 'rescue'
+                            ? `救助方案`
+                            : approval.type === 'drone_deployment'
+                            ? `无人机调度`
+                            : `事件编号：${approval.targetId}`}
                         </div>
+                        {approval.captureTimestamp && (
+                          <div className="text-xs text-cyan-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                            <span>抓拍: {new Date(approval.captureTimestamp).toLocaleString('zh-CN', {
+                              month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+                            })}</span>
+                            {typeof approval.captureConfidence === 'number' && (
+                              <span className="text-orange-400">
+                                置信度 {Math.round(approval.captureConfidence * 100)}%
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center justify-between mt-1 gap-2">
                           <span className="text-xs text-gray-500">
                             {new Date(approval.createdAt).toLocaleString('zh-CN', {

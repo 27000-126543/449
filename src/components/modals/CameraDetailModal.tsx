@@ -91,13 +91,20 @@ export default function CameraDetailModal({ isOpen, onClose, onGoToApproval }: C
         status: 'pending',
         description: `${camera.name} 检测到人形轮廓，疑似偷猎活动`,
         searchPath: [],
+        timestamp: currentCapture.timestamp,
       });
 
       const approvalId = addApproval({
         type: 'poaching',
-        targetId: `CAP-${currentCapture.id}-${Date.now()}`,
+        targetId: alertId,
         status: 'pending_level1',
-        description: `${camera.name} 人形检测事件审批 - 疑似偷猎活动`,
+        description: `${camera.name} 偷猎事件追捕方案审批`,
+        cameraId: camera.id,
+        cameraName: camera.name,
+        captureTimestamp: currentCapture.timestamp,
+        captureConfidence: currentCapture.confidence,
+        eventPosition: camera.position,
+        alertId: alertId,
       });
 
       setLastApprovalId(approvalId);

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { WorkOrder, Position } from '@/types';
 import { mockWorkOrders } from '@/data/workOrders';
 import { useRangerStore } from './useRangerStore';
+import { useAlertStore } from './useAlertStore';
 
 interface WorkOrderState {
   workOrders: WorkOrder[];
@@ -37,11 +38,17 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
   },
 
   updateWorkOrderStatus: (id, status) =>
-    set((state) => ({
-      workOrders: state.workOrders.map((wo) =>
-        wo.id === id ? { ...wo, status } : wo
-      ),
-    })),
+    set((state) => {
+      const order = state.workOrders.find((wo) => wo.id === id);
+      if (order && status === 'completed' && order.alertId) {
+        useAlertStore.getState().updateAlertStatus(order.alertId, 'resolved');
+      }
+      return {
+        workOrders: state.workOrders.map((wo) =>
+          wo.id === id ? { ...wo, status } : wo
+        ),
+      };
+    }),
 
   assignRanger: (orderId, rangerId) => {
     const order = get().getWorkOrderById(orderId);

@@ -8,7 +8,7 @@ interface AlertState {
   selectedAlertId: string | null;
   getAlertById: (id: string) => Alert | undefined;
   selectAlert: (id: string | null) => void;
-  addAlert: (alert: Omit<Alert, 'id' | 'timestamp'> & { timestamp?: Date }) => void;
+  addAlert: (alert: Omit<Alert, 'id' | 'timestamp'> & { timestamp?: Date }) => string;
   updateAlertStatus: (id: string, status: Alert['status']) => void;
   updateAlertLevel: (id: string, level: Alert['level']) => void;
   assignRanger: (alertId: string, rangerId: string) => void;
@@ -32,15 +32,17 @@ export const useAlertStore = create<AlertState>((set, get) => ({
   selectAlert: (id) => set({ selectedAlertId: id }),
 
   addAlert: (alertData) => {
+    const alertId = `ALT-${Date.now()}`;
     const newAlert: Alert = {
       ...alertData,
-      id: `ALT-${Date.now()}`,
+      id: alertId,
       timestamp: alertData.timestamp || new Date(),
       searchPath: alertData.searchPath || [],
     } as Alert;
     set((state) => ({
       alerts: [newAlert, ...state.alerts],
     }));
+    return alertId;
   },
 
   updateAlertStatus: (id, status) =>

@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from '@/components/ui/Modal';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { CheckCircle, XCircle, Clock, User, FileText, ChevronRight } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, User, FileText, ChevronRight, Camera, MapPin, AlertTriangle } from 'lucide-react';
 import { useApprovalStore } from '@/store/useApprovalStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useWorkOrderStore } from '@/store/useWorkOrderStore';
+import { useRangerStore } from '@/store/useRangerStore';
+import { useAlertStore } from '@/store/useAlertStore';
 import { cn } from '@/lib/utils';
+import type { Position } from '@/types';
 
 interface ApprovalFlowModalProps {
   isOpen: boolean;
@@ -19,8 +23,63 @@ export default function ApprovalFlowModal({ isOpen, onClose }: ApprovalFlowModal
   const approveLevel2 = useApprovalStore((state) => state.approveLevel2);
   const approveLevel3 = useApprovalStore((state) => state.approveLevel3);
   const reject = useApprovalStore((state) => state.reject);
+  const setChasePath = useApprovalStore((state) => state.setChasePath);
   const currentUser = useAuthStore((state) => state.currentUser);
+  const addWorkOrder = useWorkOrderStore((state) => state.addWorkOrder);
+  const assignNearestRanger = useWorkOrderStore((state) => state.assignNearestRanger);
+  const getNearestRanger = useRangerStore((state) => state.getNearestRanger);
+  const getWorkOrderById = useWorkOrderStore((state) => state.getWorkOrderById);
+  const updateAlertStatus = useAlertStore((state) => state.updateAlertStatus);
   const [comment, setComment] = useState('');
+  const [workOrderCreated, setWorkOrderCreated] = useState(false);
+
+  useEffect(() => {
+    if (!approval || approval.type !== 'poaching' || approval.status !== 'approved') return;
+    if (approval.workOrderId) {
+      setWorkOrderCreated(true);
+      return;
+    }
+    if (workOrderCreated) return;
+
+    const nearestRanger = approval.eventPosition ? getNearestRanger(approval.eventPosition) : undefined;
+    const routePath: Position[] = [];
+    if (nearestRanger && approval.eventPosition) {
+      const steps = 12;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const x = nearestRanger.position[0] + (approval.eventPosition[0] - nearestRanger.position[0]) * t;
+        const z = nearestRanger.position[2] + (approval.eventPosition[2] - nearestRanger.position[2]) * t;
+        routePath.push([x, 0.1, z]);
+      }
+    } else if (approval.eventPosition) {
+      routePath.push(approval.eventPosition);
+    }
+
+    const workOrderId = `WO-${Date.now()}`;
+    addWorkOrder({
+      type: 'investigation',
+      position: approval.eventPosition || [0, 0, 0],
+      status: 'assigned',
+      routePath,
+      description: `偷猎事件追捕处置 - ${approval.cameraName || approval.description} - 关联审批 ${approval.id}`,
+      priority: 'critical',
+      assignedRangerId: nearestRanger?.id,
+      createdAt: new Date(),
+      alertId: approval.alertId,
+      cameraId: approval.cameraId,
+    } as any);
+
+    if (nearestRanger) {
+      assignNearestRanger(workOrderId);
+    }
+
+    if (approval.alertId) {
+      updateAlertStatus(approval.alertId, 'processing');
+    }
+
+    setChasePath(approval.id, routePath);
+    setWorkOrderCreated(true);
+  }, [approval?.status, approval?.type, approval?.id, workOrderCreated, addWorkOrder, assignNearestRanger, getNearestRanger, updateAlertStatus, setChasePath, approval?.workOrderId, approval?.eventPosition, approval?.cameraName, approval?.description, approval?.alertId]);
 
   if (!approval) return null;
 
@@ -97,7 +156,7 @@ export default function ApprovalFlowModal({ isOpen, onClose }: ApprovalFlowModal
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-white">{approval.description}</h3>
-                <div className="mt-2 flex items-center gap-4 text-sm">
+                <div className="mt-2 flex items-center gap-4 text-sm flex-wrap">
                   <span className="text-gray-400">
                     类型: <span className="text-white">{getApprovalTypeText(approval.type)}</span>
                   </span>
@@ -105,6 +164,41 @@ export default function ApprovalFlowModal({ isOpen, onClose }: ApprovalFlowModal
                     提交时间: <span className="text-white">{formatTime(approval.createdAt)}</span>
                   </span>
                 </div>
+                {approval.cameraName && (
+                  <div className="mt-3 p-3 bg-gray-900/60 rounded-lg space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-300">
+                      <Camera size={14} className="text-cyan-400" />
+                      <span className="text-gray-400">抓拍相机:</span>
+                      <span className="text-white font-medium">{approval.cameraName}</span>
+                      {approval.cameraId && (
+                        <span className="text-gray-500">({approval.cameraId})</span>
+                      )}
+                    </div>
+                    {approval.captureTimestamp && (
+                      <div className="flex items-center gap-2 text-xs text-gray-300">
+                        <Clock size={14} className="text-yellow-400" />
+                        <span className="text-gray-400">抓拍时间:</span>
+                        <span className="text-cyan-400 font-medium">{formatTime(approval.captureTimestamp)}</span>
+                      </div>
+                    )}
+                    {typeof approval.captureConfidence === 'number' && (
+                      <div className="flex items-center gap-2 text-xs text-gray-300">
+                        <AlertTriangle size={14} className="text-orange-400" />
+                        <span className="text-gray-400">检测置信度:</span>
+                        <span className="text-orange-400 font-medium">{Math.round(approval.captureConfidence * 100)}%</span>
+                      </div>
+                    )}
+                    {approval.eventPosition && (
+                      <div className="flex items-center gap-2 text-xs text-gray-300">
+                        <MapPin size={14} className="text-red-400" />
+                        <span className="text-gray-400">事件位置:</span>
+                        <span className="text-red-300 font-medium">
+                          ({approval.eventPosition[0].toFixed(1)}, {approval.eventPosition[2].toFixed(1)})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="mt-2">
                   <span
                     className={cn(
