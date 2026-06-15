@@ -1,0 +1,89 @@
+import { create } from 'zustand';
+import type { WorkOrder, Position } from '@/types';
+import { mockWorkOrders } from '@/data/workOrders';
+import { useRangerStore } from './useRangerStore';
+
+interface WorkOrderState {
+  workOrders: WorkOrder[];
+  selectedWorkOrderId: string | null;
+  getWorkOrderById: (id: string) => WorkOrder | undefined;
+  selectWorkOrder: (id: string | null) => void;
+  addWorkOrder: (order: Omit<WorkOrder, 'id' | 'createdAt'>) => void;
+  updateWorkOrderStatus: (id: string, status: WorkOrder['status']) => void;
+  assignRanger: (orderId: string, rangerId: string) => void;
+  setRoutePath: (orderId: string, path: Position[]) => void;
+  getPendingOrders: () => WorkOrder[];
+  getActiveOrders: () => WorkOrder[];
+  assignNearestRanger: (orderId: string) => void;
+}
+
+export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
+  workOrders: mockWorkOrders,
+  selectedWorkOrderId: null,
+
+  getWorkOrderById: (id) => get().workOrders.find((wo) => wo.id === id),
+
+  selectWorkOrder: (id) => set({ selectedWorkOrderId: id }),
+
+  addWorkOrder: (orderData) => {
+    const newOrder: WorkOrder = {
+      ...orderData,
+      id: `WO-${Date.now()}`,
+      createdAt: new Date(),
+    } as WorkOrder;
+    set((state) => ({
+      workOrders: [newOrder, ...state.workOrders],
+    }));
+  },
+
+  updateWorkOrderStatus: (id, status) =>
+    set((state) => ({
+      workOrders: state.workOrders.map((wo) =>
+        wo.id === id ? { ...wo, status } : wo
+      ),
+    })),
+
+  assignRanger: (orderId, rangerId) => {
+    const order = get().getWorkOrderById(orderId);
+    const ranger = useRangerStore.getState().getRangerById(rangerId);
+    if (!order || !ranger) return;
+
+    const routePath: Position[] = [];
+    const steps = 12;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = ranger.position[0] + (order.position[0] - ranger.position[0]) * t;
+      const z = ranger.position[2] + (order.position[2] - ranger.position[2]) * t;
+      routePath.push([x, 0.1, z]);
+    }
+
+    set((state) => ({
+      workOrders: state.workOrders.map((wo) =>
+        wo.id === orderId
+          ? { ...wo, assignedRangerId: rangerId, status: 'assigned', routePath }
+          : wo
+      ),
+    }));
+  },
+
+  setRoutePath: (orderId, path) =>
+    set((state) => ({
+      workOrders: state.workOrders.map((wo) =>
+        wo.id === orderId ? { ...wo, routePath: path } : wo
+      ),
+    })),
+
+  getPendingOrders: () => get().workOrders.filter((wo) => wo.status === 'pending'),
+
+  getActiveOrders: () =>
+    get().workOrders.filter((wo) => wo.status === 'assigned' || wo.status === 'in_progress'),
+
+  assignNearestRanger: (orderId) => {
+    const order = get().getWorkOrderById(orderId);
+    if (!order) return;
+    const nearestRanger = useRangerStore.getState().getNearestRanger(order.position);
+    if (nearestRanger) {
+      get().assignRanger(orderId, nearestRanger.id);
+    }
+  },
+}));
