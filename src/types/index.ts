@@ -1,5 +1,9 @@
 export type Position = [number, number, number];
 
+export type RescueSeverity = 'mild' | 'moderate' | 'severe' | 'critical';
+
+export type RescueStatus = 'reported' | 'approved' | 'in_transit' | 'treated' | 'released';
+
 export type AnimalStatus = 'normal' | 'warning' | 'danger' | 'lost';
 
 export type AnimalSpecies = 'tiger' | 'elephant' | 'panda' | 'deer' | 'monkey' | 'leopard';
@@ -136,6 +140,22 @@ export interface Approval {
   description: string;
 }
 
+export interface RescueStaff {
+  id: string;
+  name: string;
+  role: 'vet' | 'caretaker' | 'director' | 'driver';
+  phone: string;
+  avatar?: string;
+}
+
+export interface RescueVehicle {
+  id: string;
+  name: string;
+  type: 'ambulance' | 'suv' | 'truck';
+  status: 'available' | 'in_use' | 'maintenance';
+  plate: string;
+}
+
 export interface RescueStation {
   id: string;
   name: string;
@@ -143,16 +163,18 @@ export interface RescueStation {
   capacity: number;
   staffCount: number;
   equipment: string[];
+  vehicles: RescueVehicle[];
+  staff: RescueStaff[];
 }
 
 export interface Rescue {
   id: string;
   animalId: string;
   injuryType: string;
-  severity: 'mild' | 'moderate' | 'severe' | 'critical';
+  severity: RescueSeverity;
   stationId: string;
   route: Position[];
-  status: 'reported' | 'approved' | 'in_transit' | 'treated' | 'released';
+  status: RescueStatus;
   createdAt: Date;
   vetSignoff?: boolean;
   caretakerSignoff?: boolean;

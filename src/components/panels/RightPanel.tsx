@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Activity, MapPin, Camera, Plane, BarChart3, Layers, Download } from 'lucide-react';
+import { Activity, MapPin, Camera, Plane, BarChart3, Layers, Download, Calendar, Filter, ChevronDown } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import ProgressBar from '@/components/ui/ProgressBar';
 import Button from '@/components/ui/Button';
@@ -8,8 +8,10 @@ import { useCameraStore } from '@/store/useCameraStore';
 import { useDroneStore } from '@/store/useDroneStore';
 import { useAlertStore } from '@/store/useAlertStore';
 import { useWorkOrderStore } from '@/store/useWorkOrderStore';
+import { useRangerStore } from '@/store/useRangerStore';
 import { cn } from '@/lib/utils';
 import { generateDailyReport } from '@/utils/excel';
+import type { AnimalSpecies } from '@/types';
 
 interface RightPanelProps {
   isOpen?: boolean;
@@ -20,12 +22,17 @@ interface RightPanelProps {
 
 export default function RightPanel({ isOpen = true, onClose, showHeatMap, onToggleHeatMap }: RightPanelProps) {
   const [activeTab, setActiveTab] = useState<'stats' | 'cameras' | 'drones'>('stats');
+  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [speciesFilter, setSpeciesFilter] = useState<AnimalSpecies | 'all'>('all');
+  const [showSpeciesDropdown, setShowSpeciesDropdown] = useState(false);
 
   const animals = useAnimalStore((state) => state.animals);
   const cameras = useCameraStore((state) => state.cameras);
+  const selectCamera = useCameraStore((state) => state.selectCamera);
   const drones = useDroneStore((state) => state.drones);
   const alerts = useAlertStore((state) => state.alerts);
   const workOrders = useWorkOrderStore((state) => state.workOrders);
+  const rangers = useRangerStore((state) => state.rangers);
 
   const totalAnimals = animals.length;
   const normalAnimals = animals.filter((a) => a.status === 'normal').length;
@@ -57,6 +64,16 @@ export default function RightPanel({ isOpen = true, onClose, showHeatMap, onTogg
     return acc;
   }, {});
 
+  const speciesOptions: { value: AnimalSpecies | 'all'; label: string }[] = [
+    { value: 'all', label: '全部物种' },
+    { value: 'tiger', label: '华南虎' },
+    { value: 'elephant', label: '亚洲象' },
+    { value: 'panda', label: '大熊猫' },
+    { value: 'deer', label: '梅花鹿' },
+    { value: 'monkey', label: '金丝猴' },
+    { value: 'leopard', label: '金钱豹' },
+  ];
+
   const getSpeciesName = (species: string) => {
     const map: Record<string, string> = {
       tiger: '华南虎',
@@ -70,15 +87,19 @@ export default function RightPanel({ isOpen = true, onClose, showHeatMap, onTogg
   };
 
   const handleExportReport = () => {
-    const today = new Date().toISOString().split('T')[0];
     generateDailyReport({
-      date: today,
+      date: reportDate,
       animals,
-      rangers: [],
+      rangers,
       cameras,
       alerts,
       workOrders,
+      speciesFilter,
     });
+  };
+
+  const handleCameraClick = (cameraId: string) => {
+    selectCamera(cameraId);
   };
 
   if (!isOpen) return null;
@@ -217,10 +238,77 @@ export default function RightPanel({ isOpen = true, onClose, showHeatMap, onTogg
               </Card.Body>
             </Card>
 
-            <Button variant="primary" className="w-full" onClick={handleExportReport}>
-              <Download size={16} className="mr-2" />
-              导出监测日报
-            </Button>
+            <Card>
+              <Card.Header>
+                <div className="flex items-center gap-2">
+                  <Download size={16} className="text-blue-400" />
+                  <span className="text-sm font-medium text-white">导出监测日报</span>
+                </div>
+              </Card.Header>
+              <Card.Body className="space-y-3">
+                <div>
+                  <label className="flex items-center gap-1 text-xs text-gray-400 mb-1">
+                    <Calendar size={12} />
+                    选择日期
+                  </label>
+                  <input
+                    type="date"
+                    value={reportDate}
+                    onChange={(e) => setReportDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="relative">
+                  <label className="flex items-center gap-1 text-xs text-gray-400 mb-1">
+                    <Filter size={12} />
+                    物种筛选
+                  </label>
+                  <button
+                    onClick={() => setShowSpeciesDropdown(!showSpeciesDropdown)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm text-left flex items-center justify-between hover:border-gray-600 transition-colors"
+                  >
+                    <span>{getSpeciesName(speciesFilter)}</span>
+                    <ChevronDown size={14} className={cn(
+                      'transition-transform',
+                      showSpeciesDropdown && 'rotate-180'
+                    )} />
+                  </button>
+                  {showSpeciesDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 max-h-48 overflow-y-auto">
+                      {speciesOptions.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => {
+                            setSpeciesFilter(opt.value);
+                            setShowSpeciesDropdown(false);
+                          }}
+                          className={cn(
+                            'w-full px-3 py-2 text-left text-sm hover:bg-gray-700 transition-colors',
+                            speciesFilter === opt.value
+                              ? 'text-emerald-400 bg-emerald-500/10'
+                              : 'text-white'
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-xs text-gray-500 bg-gray-800/50 p-2 rounded">
+                  报告日期: <span className="text-gray-300">{reportDate}</span>
+                  <br />
+                  筛选条件: <span className="text-gray-300">{getSpeciesName(speciesFilter)}</span>
+                </div>
+
+                <Button variant="primary" className="w-full" onClick={handleExportReport}>
+                  <Download size={16} className="mr-2" />
+                  导出Excel日报
+                </Button>
+              </Card.Body>
+            </Card>
           </>
         )}
 
@@ -249,10 +337,24 @@ export default function RightPanel({ isOpen = true, onClose, showHeatMap, onTogg
 
             <div className="space-y-2">
               {cameras.map((camera) => (
-                <Card key={camera.id} hoverable>
+                <Card
+                  key={camera.id}
+                  hoverable
+                  onClick={() => handleCameraClick(camera.id)}
+                >
                   <Card.Body className="py-2">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-white">{camera.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Camera
+                          size={14}
+                          className={cn(
+                            camera.status === 'online' && 'text-cyan-400',
+                            camera.status === 'low_battery' && 'text-yellow-400',
+                            camera.status === 'offline' && 'text-gray-500'
+                          )}
+                        />
+                        <span className="text-sm font-medium text-white">{camera.name}</span>
+                      </div>
                       <span
                         className={cn(
                           'w-2 h-2 rounded-full',
@@ -274,9 +376,13 @@ export default function RightPanel({ isOpen = true, onClose, showHeatMap, onTogg
                         <span className="text-xs text-gray-300 w-10 text-right">{camera.storage}%</span>
                       </div>
                     </div>
+                    <div className="mt-1 flex justify-between items-center text-xs text-gray-500">
+                      <span>抓拍 {camera.captures.length} 条</span>
+                      <span className="text-emerald-400">点击查看 →</span>
+                    </div>
                     {camera.hasHumanDetection && (
-                      <div className="mt-2 px-2 py-1 bg-red-500/20 rounded text-xs text-red-400 text-center">
-                        ⚠ 检测到人形轮廓
+                      <div className="mt-2 px-2 py-1 bg-red-500/20 rounded text-xs text-red-400 text-center animate-pulse">
+                        ⚠ 检测到人形轮廓 - 点击处理
                       </div>
                     )}
                   </Card.Body>

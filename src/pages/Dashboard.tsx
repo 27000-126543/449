@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import TopBar from '@/components/panels/TopBar';
 import LeftPanel from '@/components/panels/LeftPanel';
 import RightPanel from '@/components/panels/RightPanel';
@@ -16,6 +16,7 @@ import { useWorkOrderStore } from '@/store/useWorkOrderStore';
 import { useApprovalStore } from '@/store/useApprovalStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
+import type { Position } from '@/types';
 
 type ModalType = 'animal' | 'alert' | 'camera' | 'approval' | 'workorder' | 'rescue' | null;
 
@@ -26,12 +27,15 @@ export default function Dashboard() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [showHeatMap, setShowHeatMap] = useState(true);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [rescueRoute, setRescueRoute] = useState<Position[] | null>(null);
 
   const selectedAnimalId = useAnimalStore((state) => state.selectedAnimalId);
   const selectedAlertId = useAlertStore((state) => state.selectedAlertId);
   const selectedCameraId = useCameraStore((state) => state.selectedCameraId);
   const selectedWorkOrderId = useWorkOrderStore((state) => state.selectedWorkOrderId);
   const selectedApprovalId = useApprovalStore((state) => state.selectedApprovalId);
+
+  const animals = useAnimalStore((state) => state.animals);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -78,6 +82,24 @@ export default function Dashboard() {
     useApprovalStore.getState().selectApproval(null);
   };
 
+  const handleOpenRescue = useCallback(() => {
+    const animal = animals.find(a => a.id === selectedAnimalId);
+    if (animal) {
+      const rescueStation: Position = [30, 0, -25];
+      const startPos = animal.position;
+      const midX = (startPos[0] + rescueStation[0]) / 2;
+      const midZ = (startPos[2] + rescueStation[2]) / 2;
+      setRescueRoute([
+        startPos,
+        [midX, 0.5, startPos[2]],
+        [midX, 0.5, midZ],
+        [rescueStation[0], 0.5, midZ],
+        rescueStation,
+      ]);
+    }
+    setActiveModal('rescue');
+  }, [animals, selectedAnimalId]);
+
   if (!isLoggedIn) {
     return null;
   }
@@ -101,14 +123,40 @@ export default function Dashboard() {
         </div>
 
         <div className="flex-1 relative">
-          <Scene showHeatMap={showHeatMap} />
+          <Scene showHeatMap={showHeatMap} rescueRoute={rescueRoute} />
 
           <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-900/80 backdrop-blur-sm rounded-full px-4 py-2 border border-gray-700/50">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <span className="text-sm text-gray-300">系统运行中</span>
             <div className="w-px h-4 bg-gray-700" />
             <span className="text-sm text-emerald-400 font-medium">实时监控</span>
+            {rescueRoute && (
+              <>
+                <div className="w-px h-4 bg-gray-700" />
+                <div className="flex items-center gap-1 text-xs text-blue-400">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  救助运输路线已激活
+                </div>
+              </>
+            )}
           </div>
+
+          {rescueRoute && (
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-blue-500/20 backdrop-blur-sm border border-blue-500/40 rounded-lg px-4 py-2 z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+                <span className="text-sm text-blue-300 font-medium">
+                  🚨 动物救助运输中 - 已规划最优路线至救助站
+                </span>
+                <button
+                  onClick={() => setRescueRoute(null)}
+                  className="ml-2 text-xs text-blue-400 hover:text-blue-300"
+                >
+                  [清除]
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="absolute bottom-4 left-4 flex gap-2">
             <button
@@ -150,7 +198,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <AnimalDetailModal isOpen={activeModal === 'animal'} onClose={handleCloseModal} />
+      <AnimalDetailModal isOpen={activeModal === 'animal'} onClose={handleCloseModal} onOpenRescue={handleOpenRescue} />
       <AlertDetailModal isOpen={activeModal === 'alert'} onClose={handleCloseModal} />
       <CameraDetailModal isOpen={activeModal === 'camera'} onClose={handleCloseModal} />
       <ApprovalFlowModal isOpen={activeModal === 'approval'} onClose={handleCloseModal} />

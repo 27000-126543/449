@@ -8,7 +8,7 @@ interface ApprovalState {
   selectedApprovalId: string | null;
   getApprovalById: (id: string) => Approval | undefined;
   selectApproval: (id: string | null) => void;
-  addApproval: (approval: Omit<Approval, 'id' | 'createdAt'>) => void;
+  addApproval: (approval: Omit<Approval, 'id' | 'createdAt'>) => string;
   approveLevel1: (id: string, comment: string) => void;
   approveLevel2: (id: string, comment: string) => void;
   approveLevel3: (id: string, comment: string) => void;
@@ -27,15 +27,17 @@ export const useApprovalStore = create<ApprovalState>((set, get) => ({
   selectApproval: (id) => set({ selectedApprovalId: id }),
 
   addApproval: (approvalData) => {
+    const approvalId = `APP-${Date.now()}`;
     const newApproval: Approval = {
       ...approvalData,
-      id: `APP-${Date.now()}`,
+      id: approvalId,
       createdAt: new Date(),
       status: 'pending_level1',
     } as Approval;
     set((state) => ({
       approvals: [newApproval, ...state.approvals],
     }));
+    return approvalId;
   },
 
   approveLevel1: (id, comment) => {

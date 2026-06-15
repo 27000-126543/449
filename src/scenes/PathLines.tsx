@@ -1,97 +1,119 @@
 import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import type { Position } from '@/types';
 import { useAlertStore } from '@/store/useAlertStore';
 import { useWorkOrderStore } from '@/store/useWorkOrderStore';
 import { useApprovalStore } from '@/store/useApprovalStore';
+import type { Position } from '@/types';
 
-export default function PathLines() {
+interface PathLinesProps {
+  rescueRoute?: Position[] | null;
+}
+
+export default function PathLines({ rescueRoute = null }: PathLinesProps) {
   const alerts = useAlertStore((state) => state.alerts);
   const workOrders = useWorkOrderStore((state) => state.workOrders);
   const approvals = useApprovalStore((state) => state.approvals);
 
-  const activeAlerts = alerts.filter(
-    (a) => (a.status === 'pending' || a.status === 'processing') && a.searchPath.length > 0
-  );
-
-  const activeOrders = workOrders.filter(
-    (wo) =>
-      (wo.status === 'assigned' || wo.status === 'in_progress') && wo.routePath.length > 0
-  );
-
-  const activeApprovals = approvals.filter(
-    (a) => a.status === 'approved' && a.chasePath && a.chasePath.length > 0
-  );
+  const searchPathAlerts = alerts.filter((a) => a.searchPath && a.searchPath.length > 1);
+  const pathWorkOrders = workOrders.filter((wo) => wo.routePath && wo.routePath.length > 1);
+  const approvedApprovals = approvals.filter((a) => a.status === 'approved' && a.chasePath && a.chasePath.length > 1);
 
   return (
     <group>
-      {activeAlerts.map((alert) => (
-        <AnimatedPath
-          key={`alert-${alert.id}`}
-          points={alert.searchPath}
+      {searchPathAlerts.map((alert) => (
+        <PathLine
+          key={`search-${alert.id}`}
+          points={alert.searchPath as Position[]}
           color="#3b82f6"
+          lineWidth={1}
         />
       ))}
 
-      {activeOrders.map((order) => (
-        <AnimatedPath
-          key={`order-${order.id}`}
-          points={order.routePath}
+      {pathWorkOrders.map((wo) => (
+        <PathLine
+          key={`wo-${wo.id}`}
+          points={wo.routePath as Position[]}
           color="#22c55e"
+          lineWidth={1}
         />
       ))}
 
-      {activeApprovals.map((approval) => (
-        <AnimatedPath
-          key={`approval-${approval.id}`}
-          points={approval.chasePath || []}
+      {approvedApprovals.map((approval) => (
+        <PathLine
+          key={`chase-${approval.id}`}
+          points={approval.chasePath as Position[]}
           color="#ef4444"
+          lineWidth={1.5}
         />
       ))}
+
+      {rescueRoute && rescueRoute.length > 1 && (
+        <PathLine
+          points={rescueRoute}
+          color="#3b82f6"
+          lineWidth={2.5}
+          glow={true}
+        />
+      )}
     </group>
   );
 }
 
-interface AnimatedPathProps {
+interface PathLineProps {
   points: Position[];
   color: string;
+  lineWidth?: number;
+  glow?: boolean;
 }
 
-function AnimatedPath({ points, color }: AnimatedPathProps) {
+function PathLine({ points, color, lineWidth = 1, glow = false }: PathLineProps) {
   const lineRef = useRef<THREE.Line>(null);
   const offsetRef = useRef(0);
-
-  const geometry = useMemo(() => {
-    if (points.length < 2) return new THREE.BufferGeometry();
-
-    const curvePoints = points.map(
-      (p) => new THREE.Vector3(p[0], p[1] + 0.1, p[2])
-    );
-    const curve = new THREE.CatmullRomCurve3(curvePoints);
-    const sampledPoints = curve.getPoints(100);
-    const geo = new THREE.BufferGeometry().setFromPoints(sampledPoints);
-    geo.computeBoundingSphere();
-    return geo;
-  }, [points]);
-
-  const material = useMemo(
-    () =>
-      new THREE.LineDashedMaterial({
-        color,
-        dashSize: 1,
-        gapSize: 0.5,
-        transparent: true,
-        opacity: 0.8,
-      }),
-    [color]
-  );
+  const glowLineRef = useRef<THREE.Line>(null);
 
   const lineObject = useMemo(() => {
-    const line = new THREE.Line(geometry, material);
-    line.computeLineDistances();
-    return line;
-  }, [geometry, material]);
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(points.length * 3);
+    points.forEach((p, i) => {
+      positions[i * 3] = p[0];
+      positions[i * 3 + 1] = p[1] + 0.3;
+      positions[i * 3 + 2] = p[2];
+    });
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const material = new THREE.LineDashedMaterial({
+      color: new THREE.Color(color),
+      dashSize: 1,
+      gapSize: 0.5,
+      linewidth: lineWidth,
+      transparent: true,
+      opacity: glow ? 1 : 0.8,
+    });
+
+    return new THREE.Line(geometry, material);
+  }, [points, color, lineWidth, glow]);
+
+  const glowLineObject = useMemo(() => {
+    if (!glow) return null;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(points.length * 3);
+    points.forEach((p, i) => {
+      positions[i * 3] = p[0];
+      positions[i * 3 + 1] = p[1] + 0.2;
+      positions[i * 3 + 2] = p[2];
+    });
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const material = new THREE.LineBasicMaterial({
+      color: new THREE.Color(color),
+      linewidth: lineWidth * 3,
+      transparent: true,
+      opacity: 0.2,
+    });
+
+    return new THREE.Line(geometry, material);
+  }, [points, color, lineWidth, glow]);
 
   useEffect(() => {
     if (lineObject) {
@@ -101,7 +123,7 @@ function AnimatedPath({ points, color }: AnimatedPathProps) {
 
   useFrame((_, delta) => {
     if (lineRef.current) {
-      offsetRef.current += delta * 2;
+      offsetRef.current += delta * (glow ? 3 : 2);
       const mat = lineRef.current.material as THREE.LineDashedMaterial;
       mat.dashSize = 1;
       mat.gapSize = 0.5;
@@ -117,5 +139,10 @@ function AnimatedPath({ points, color }: AnimatedPathProps) {
 
   if (points.length < 2) return null;
 
-  return <primitive object={lineObject} ref={lineRef} />;
+  return (
+    <group>
+      <primitive object={lineObject} ref={lineRef} />
+      {glowLineObject && <primitive object={glowLineObject} ref={glowLineRef} />}
+    </group>
+  );
 }

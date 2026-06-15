@@ -8,6 +8,15 @@ export const mockRescueStations: RescueStation[] = [
     capacity: 10,
     staffCount: 5,
     equipment: ['急救箱', '担架', '运输车', '恒温箱'],
+    vehicles: [
+      { id: 'V001', name: '急救车-01', type: 'ambulance', status: 'available', plate: '粤B-A1234' },
+      { id: 'V002', name: '巡逻SUV', type: 'suv', status: 'in_use', plate: '粤B-B5678' },
+    ],
+    staff: [
+      { id: 'S001', name: '王兽医', role: 'vet', phone: '138****1001' },
+      { id: 'S002', name: '李保育员', role: 'caretaker', phone: '138****1002' },
+      { id: 'S003', name: '赵司机', role: 'driver', phone: '138****1003' },
+    ],
   },
   {
     id: 'RS002',
@@ -16,6 +25,13 @@ export const mockRescueStations: RescueStation[] = [
     capacity: 8,
     staffCount: 4,
     equipment: ['急救箱', '担架', '运输车'],
+    vehicles: [
+      { id: 'V003', name: '急救车-02', type: 'ambulance', status: 'available', plate: '粤B-C2345' },
+    ],
+    staff: [
+      { id: 'S004', name: '张兽医', role: 'vet', phone: '138****2001' },
+      { id: 'S005', name: '刘保育员', role: 'caretaker', phone: '138****2002' },
+    ],
   },
   {
     id: 'RS003',
@@ -24,6 +40,18 @@ export const mockRescueStations: RescueStation[] = [
     capacity: 20,
     staffCount: 12,
     equipment: ['手术室', 'ICU', '急救箱', '担架', '运输车', '恒温箱', '检测设备'],
+    vehicles: [
+      { id: 'V004', name: '急救车-03', type: 'ambulance', status: 'available', plate: '粤B-D3456' },
+      { id: 'V005', name: '急救车-04', type: 'ambulance', status: 'maintenance', plate: '粤B-E7890' },
+      { id: 'V006', name: '运输车', type: 'truck', status: 'available', plate: '粤B-F0123' },
+    ],
+    staff: [
+      { id: 'S006', name: '陈主任', role: 'director', phone: '138****3001' },
+      { id: 'S007', name: '周兽医', role: 'vet', phone: '138****3002' },
+      { id: 'S008', name: '吴兽医', role: 'vet', phone: '138****3003' },
+      { id: 'S009', name: '郑保育员', role: 'caretaker', phone: '138****3004' },
+      { id: 'S010', name: '孙司机', role: 'driver', phone: '138****3005' },
+    ],
   },
 ];
 

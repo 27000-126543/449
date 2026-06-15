@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, User, Eye, EyeOff, Camera } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -14,6 +14,8 @@ export default function Login() {
   const [scanProgress, setScanProgress] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState('');
+  const timerRef = useRef<number | null>(null);
+  const loginStartedRef = useRef(false);
 
   const roles = [
     { id: 'ranger' as RangerRole, label: '巡护员', names: ['张伟', '李芳', '王强', '赵敏'] },
@@ -23,35 +25,49 @@ export default function Login() {
 
   const currentRole = roles.find((r) => r.id === selectedRole);
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
+
   const handleStartFaceScan = () => {
     if (!username) {
       setError('请选择或输入用户名');
       return;
     }
+    if (loginStartedRef.current) return;
+    loginStartedRef.current = true;
     setError('');
     setShowFaceScan(true);
     setIsScanning(true);
     setScanProgress(0);
 
-    const interval = setInterval(() => {
+    const step = () => {
       setScanProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
+        const next = Math.min(prev + 5, 100);
+        if (next >= 100) {
           setIsScanning(false);
-          setTimeout(() => {
+          timerRef.current = window.setTimeout(() => {
             const success = login(selectedRole, username);
+            loginStartedRef.current = false;
             if (success) {
               navigate('/dashboard');
             } else {
               setError('登录失败，请重试');
               setShowFaceScan(false);
             }
-          }, 500);
-          return 100;
+          }, 600);
+        } else {
+          timerRef.current = window.setTimeout(step, 30);
         }
-        return prev + 2;
+        return next;
       });
-    }, 50);
+    };
+    timerRef.current = window.setTimeout(step, 30);
   };
 
   const handleSelectUser = (name: string) => {

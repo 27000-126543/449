@@ -1,7 +1,7 @@
 import Modal from '@/components/ui/Modal';
 import Card from '@/components/ui/Card';
 import ProgressBar from '@/components/ui/ProgressBar';
-import { PawPrint, Heart, Thermometer, Clock, MapPin, Users } from 'lucide-react';
+import { PawPrint, Heart, Thermometer, Clock, MapPin, Users, AlertTriangle, X } from 'lucide-react';
 import { useAnimalStore } from '@/store/useAnimalStore';
 import { useAlertStore } from '@/store/useAlertStore';
 import { cn } from '@/lib/utils';
@@ -20,14 +20,15 @@ import { useMemo } from 'react';
 interface AnimalDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenRescue?: () => void;
 }
 
-export default function AnimalDetailModal({ isOpen, onClose }: AnimalDetailModalProps) {
+export default function AnimalDetailModal({ isOpen, onClose, onOpenRescue }: AnimalDetailModalProps) {
   const selectedAnimalId = useAnimalStore((state) => state.selectedAnimalId);
-  const animal = useAnimalStore((state) => state.getAnimalById(selectedAnimalId || ''));
-  const groupAnimals = useAnimalStore((state) =>
-    animal ? state.getAnimalsByGroup(animal.groupId) : []
-  );
+  const getAnimalById = useAnimalStore((state) => state.getAnimalById);
+  const getAnimalsByGroup = useAnimalStore((state) => state.getAnimalsByGroup);
+  const animal = useMemo(() => getAnimalById(selectedAnimalId || ''), [getAnimalById, selectedAnimalId]);
+  const groupAnimals = useMemo(() => animal ? getAnimalsByGroup(animal.groupId) : [], [getAnimalsByGroup, animal]);
   const createAlert = useAlertStore((state) => state.createAlertFromAnimal);
 
   const heartRateData = useMemo(() => {
@@ -103,8 +104,16 @@ export default function AnimalDetailModal({ isOpen, onClose }: AnimalDetailModal
         animal.id,
         'injury',
         animal.position,
-        `${animal.name} 状态异常，需人工核查`
+        `${animal.name} 状态异常，启动救助流程`
       );
+    }
+  };
+
+  const handleStartRescue = () => {
+    handleCreateAlert();
+    onClose();
+    if (onOpenRescue) {
+      onOpenRescue();
     }
   };
 
@@ -326,19 +335,27 @@ export default function AnimalDetailModal({ isOpen, onClose }: AnimalDetailModal
           </Card.Body>
         </Card>
 
-        <div className="flex gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <button
-            onClick={handleCreateAlert}
-            className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors"
+            onClick={handleStartRescue}
+            className="col-span-2 px-4 py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
           >
-            发起救助预警
+            <AlertTriangle size={18} />
+            发起救助预警 · 启动救助流程
           </button>
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+            className="px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
           >
+            <X size={18} />
             关闭
           </button>
+        </div>
+
+        <div className="text-xs text-gray-500 bg-blue-500/10 p-3 rounded-lg border border-blue-500/30">
+          <span className="text-blue-400 font-medium">💡 提示：</span>
+          点击"发起救助预警"将自动创建救助事件，进入救助流程：推荐最近救助站 → 规划蓝色运输路线 → 兽医/保育员/主任三级会签。
+          3D场景中将同步显示救助站位置和运输轨迹动画。
         </div>
       </div>
     </Modal>

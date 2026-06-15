@@ -14,12 +14,14 @@ import Drones from './Drones';
 import HeatMap from './HeatMap';
 import PathLines from './PathLines';
 import { useState } from 'react';
+import type { Position } from '@/types';
 
 interface SceneProps {
   showHeatMap?: boolean;
+  rescueRoute?: Position[] | null;
 }
 
-export default function Scene({ showHeatMap = true }: SceneProps) {
+export default function Scene({ showHeatMap = true, rescueRoute = null }: SceneProps) {
   return (
     <Canvas
       shadows
@@ -65,7 +67,14 @@ export default function Scene({ showHeatMap = true }: SceneProps) {
       <Cameras />
       <Drones />
       {showHeatMap && <HeatMap />}
-      <PathLines />
+      <PathLines rescueRoute={rescueRoute} />
+
+      {rescueRoute && rescueRoute.length > 1 && (
+        <>
+          <RescueStationMarker position={rescueRoute[rescueRoute.length - 1]} />
+          <RescueStartMarker position={rescueRoute[0]} />
+        </>
+      )}
 
       <EffectComposer>
         <Bloom
@@ -89,5 +98,70 @@ export default function Scene({ showHeatMap = true }: SceneProps) {
         dampingFactor={0.05}
       />
     </Canvas>
+  );
+}
+
+function RescueStationMarker({ position }: { position: Position }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const scaleRef = useRef(1);
+  const alphaRef = useRef(1);
+
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      meshRef.current.position.y = 2.5 + Math.sin(Date.now() * 0.003) * 0.15;
+    }
+    if (ringRef.current) {
+      scaleRef.current = 1 + Math.sin(Date.now() * 0.004) * 0.3;
+      alphaRef.current = 0.3 + Math.sin(Date.now() * 0.004) * 0.2;
+      ringRef.current.scale.set(scaleRef.current, 1, scaleRef.current);
+    }
+  });
+
+  return (
+    <group position={[position[0], 0, position[2]]}>
+      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+        <ringGeometry args={[0.8, 1.5, 32]} />
+        <meshBasicMaterial color="#22c55e" transparent opacity={alphaRef.current} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh ref={meshRef} castShadow>
+        <cylinderGeometry args={[0.3, 0.5, 1, 8]} />
+        <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.3} />
+      </mesh>
+      <mesh position={[0, 3.5, 0]}>
+        <sphereGeometry args={[0.4, 16, 16]} />
+        <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.5} />
+      </mesh>
+      <mesh position={[0, 3.5, 0]}>
+        <pointLight color="#22c55e" intensity={1.5} distance={10} />
+      </mesh>
+    </group>
+  );
+}
+
+function RescueStartMarker({ position }: { position: Position }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += 0.02;
+      meshRef.current.position.y = 1.8 + Math.sin(Date.now() * 0.004) * 0.2;
+    }
+  });
+
+  return (
+    <group position={[position[0], 0, position[2]]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+        <ringGeometry args={[0.5, 1, 32]} />
+        <meshBasicMaterial color="#ef4444" transparent opacity={0.5} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh ref={meshRef} castShadow position={[0, 2, 0]}>
+        <coneGeometry args={[0.5, 1, 6]} />
+        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.3} />
+      </mesh>
+      <mesh position={[0, 2, 0]}>
+        <pointLight color="#ef4444" intensity={1.5} distance={8} />
+      </mesh>
+    </group>
   );
 }
